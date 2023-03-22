@@ -290,7 +290,7 @@ install_cc_sev_image() {
 }
 
 install_cc_tdx_image() {
-	AA_KBC="eaa_kbc"
+	AA_KBC="cc_kbc_tdx"
 	image_type="image"
 	image_suffix="tdx"
 	root_hash_suffix="tdx"
