@@ -26,6 +26,7 @@ const LOG_VPORT_OPTION: &str = "agent.log_vport";
 const CONTAINER_PIPE_SIZE_OPTION: &str = "agent.container_pipe_size";
 const UNIFIED_CGROUP_HIERARCHY_OPTION: &str = "agent.unified_cgroup_hierarchy";
 const CONFIG_FILE: &str = "agent.config_file";
+const REST_API_OPTION: &str = "agent.guest_components_rest_api";
 
 // Configure the proxy settings for HTTPS requests in the guest,
 // to solve the problem of not being able to access the specified image in some cases.
@@ -36,6 +37,7 @@ const DEFAULT_LOG_LEVEL: slog::Level = slog::Level::Info;
 const DEFAULT_HOTPLUG_TIMEOUT: time::Duration = time::Duration::from_secs(3);
 const DEFAULT_CONTAINER_PIPE_SIZE: i32 = 0;
 const VSOCK_ADDR: &str = "vsock://-1";
+const DEFAULT_GUEST_COMPONENTS_REST_API_CONFIG: &str = "resource";
 
 // Environment variables used for development and testing
 const SERVER_ADDR_ENV_VAR: &str = "KATA_AGENT_SERVER_ADDR";
@@ -74,6 +76,7 @@ pub struct AgentConfig {
     pub supports_seccomp: bool,
     pub https_proxy: String,
     pub no_proxy: String,
+    pub guest_components_rest_api: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,6 +94,7 @@ pub struct AgentConfigBuilder {
     pub tracing: Option<bool>,
     pub https_proxy: Option<String>,
     pub no_proxy: Option<String>,
+    pub guest_components_rest_api: Option<String>,
 }
 
 macro_rules! config_override {
@@ -154,6 +158,7 @@ impl Default for AgentConfig {
             supports_seccomp: rpc::have_seccomp(),
             https_proxy: String::from(""),
             no_proxy: String::from(""),
+            guest_components_rest_api: String::from(DEFAULT_GUEST_COMPONENTS_REST_API_CONFIG),
         }
     }
 }
@@ -185,6 +190,11 @@ impl FromStr for AgentConfig {
         config_override!(agent_config_builder, agent_config, tracing);
         config_override!(agent_config_builder, agent_config, https_proxy);
         config_override!(agent_config_builder, agent_config, no_proxy);
+        config_override!(
+            agent_config_builder,
+            agent_config,
+            guest_components_rest_api
+        );
 
         Ok(agent_config)
     }
@@ -286,6 +296,12 @@ impl AgentConfig {
             );
             parse_cmdline_param!(param, HTTPS_PROXY, config.https_proxy, get_url_value);
             parse_cmdline_param!(param, NO_PROXY, config.no_proxy, get_string_value);
+            parse_cmdline_param!(
+                param,
+                REST_API_OPTION,
+                config.guest_components_rest_api,
+                get_string_value
+            );
         }
 
         if let Ok(addr) = env::var(SERVER_ADDR_ENV_VAR) {
@@ -477,6 +493,7 @@ mod tests {
             tracing: bool,
             https_proxy: &'a str,
             no_proxy: &'a str,
+            guest_components_rest_api: &'a str,
         }
 
         impl Default for TestData<'_> {
@@ -494,6 +511,7 @@ mod tests {
                     tracing: false,
                     https_proxy: "",
                     no_proxy: "",
+                    guest_components_rest_api: DEFAULT_GUEST_COMPONENTS_REST_API_CONFIG,
                 }
             }
         }
@@ -883,6 +901,26 @@ mod tests {
                 no_proxy: "192.168.1.0/24,172.16.0.0/12",
                 ..Default::default()
             },
+            TestData {
+               contents: "agent.guest_components_rest_api=attestation",
+               guest_components_rest_api: "attestation",
+                ..Default::default()
+            },
+            TestData {
+                contents: "agent.guest_components_rest_api=resource",
+                guest_components_rest_api: "resource",
+                ..Default::default()
+            },
+            TestData {
+                contents: "agent.guest_components_rest_api=all",
+                guest_components_rest_api: "all",
+                ..Default::default()
+            },
+            TestData {
+                contents: "agent.guest_components_rest_api=''",
+                guest_components_rest_api: "",
+                ..Default::default()
+            },
         ];
 
         let dir = tempdir().expect("failed to create tmpdir");
@@ -932,6 +970,11 @@ mod tests {
             assert_eq!(d.tracing, config.tracing, "{}", msg);
             assert_eq!(d.https_proxy, config.https_proxy, "{}", msg);
             assert_eq!(d.no_proxy, config.no_proxy, "{}", msg);
+            assert_eq!(
+                d.guest_components_rest_api, config.guest_components_rest_api,
+                "{}",
+                msg
+            );
 
             for v in vars_to_unset {
                 env::remove_var(v);
