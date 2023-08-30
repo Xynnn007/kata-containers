@@ -26,7 +26,7 @@ const LOG_VPORT_OPTION: &str = "agent.log_vport";
 const CONTAINER_PIPE_SIZE_OPTION: &str = "agent.container_pipe_size";
 const UNIFIED_CGROUP_HIERARCHY_OPTION: &str = "agent.unified_cgroup_hierarchy";
 const CONFIG_FILE: &str = "agent.config_file";
-const REST_API_OPTION: &str = "agent.guest_components_rest_api";
+const GUEST_COMPONENTS_REST_API_OPTION: &str = "agent.guest_components_rest_api";
 
 // Configure the proxy settings for HTTPS requests in the guest,
 // to solve the problem of not being able to access the specified image in some cases.
@@ -298,7 +298,7 @@ impl AgentConfig {
             parse_cmdline_param!(param, NO_PROXY, config.no_proxy, get_string_value);
             parse_cmdline_param!(
                 param,
-                REST_API_OPTION,
+                GUEST_COMPONENTS_REST_API_OPTION,
                 config.guest_components_rest_api,
                 get_string_value
             );

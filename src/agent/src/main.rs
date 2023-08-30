@@ -105,6 +105,8 @@ const CDH_SOCKET: &str = "/run/confidential-containers/cdh.sock";
 
 const OCICRYPT_CONFIG_PATH: &str = "/tmp/ocicrypt_config.json";
 
+const API_SERVER_PATH: &str = "/usr/local/bin/api-server-rest";
+
 const DEFAULT_LAUNCH_PROCESS_TIMEOUT: i32 = 6;
 
 lazy_static! {
@@ -401,7 +403,7 @@ async fn start_sandbox(
     sandbox.lock().await.sender = Some(tx);
 
     if Path::new(CDH_PATH).exists() && Path::new(AA_PATH).exists() {
-        init_attestation_components(logger)?;
+        init_attestation_components(logger, config)?;
     }
 
     // vsock:///dev/vsock, port
@@ -415,7 +417,7 @@ async fn start_sandbox(
 }
 
 // Start-up attestation-agent, CDH and api-server-rest if they are packaged in the rootfs
-fn init_attestation_components(logger: &Logger) -> Result<()> {
+fn init_attestation_components(logger: &Logger, _config: &AgentConfig) -> Result<()> {
     // The Attestation Agent will run for the duration of the guest.
     launch_process(
         logger,
@@ -448,6 +450,16 @@ fn init_attestation_components(logger: &Logger) -> Result<()> {
         DEFAULT_LAUNCH_PROCESS_TIMEOUT,
     ) {
         error!(logger, "launch_process {} failed: {:?}", CDH_PATH, e);
+    } else if !_config.guest_components_rest_api.is_empty() {
+        if let Err(e) = launch_process(
+            logger,
+            API_SERVER_PATH,
+            &vec!["--features", &_config.guest_components_rest_api],
+            "",
+            0,
+        ) {
+            error!(logger, "launch_process {} failed: {:?}", API_SERVER_PATH, e);
+        }
     }
 
     Ok(())
