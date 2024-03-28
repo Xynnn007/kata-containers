@@ -58,6 +58,7 @@ mod util;
 mod version;
 mod watcher;
 
+use config::GuestComponentsFeatures;
 use mount::{cgroups_mount, general_mount};
 use sandbox::Sandbox;
 use signal::setup_signal_handler;
@@ -450,15 +451,21 @@ fn init_attestation_components(logger: &Logger, _config: &AgentConfig) -> Result
         DEFAULT_LAUNCH_PROCESS_TIMEOUT,
     ) {
         error!(logger, "launch_process {} failed: {:?}", CDH_PATH, e);
-    } else if !_config.guest_components_rest_api.is_empty() {
-        if let Err(e) = launch_process(
-            logger,
-            API_SERVER_PATH,
-            &vec!["--features", &_config.guest_components_rest_api],
-            "",
-            0,
-        ) {
-            error!(logger, "launch_process {} failed: {:?}", API_SERVER_PATH, e);
+    } else {
+        let features = _config.guest_components_rest_api;
+        match features {
+            GuestComponentsFeatures::None => {}
+            _ => {
+                if let Err(e) = launch_process(
+                    logger,
+                    API_SERVER_PATH,
+                    &vec!["--features", &features.to_string()],
+                    "",
+                    0,
+                ) {
+                    error!(logger, "launch_process {} failed: {:?}", API_SERVER_PATH, e);
+                }
+            }
         }
     }
 
