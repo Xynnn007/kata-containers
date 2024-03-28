@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 use crate::rpc;
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use serde::Deserialize;
 use std::env;
+use std::fmt;
 use std::fs;
 use std::str::FromStr;
 use std::time;
@@ -37,7 +38,6 @@ const DEFAULT_LOG_LEVEL: slog::Level = slog::Level::Info;
 const DEFAULT_HOTPLUG_TIMEOUT: time::Duration = time::Duration::from_secs(3);
 const DEFAULT_CONTAINER_PIPE_SIZE: i32 = 0;
 const VSOCK_ADDR: &str = "vsock://-1";
-const DEFAULT_GUEST_COMPONENTS_REST_API_CONFIG: &str = "resource";
 
 // Environment variables used for development and testing
 const SERVER_ADDR_ENV_VAR: &str = "KATA_AGENT_SERVER_ADDR";
@@ -50,7 +50,6 @@ const ERR_INVALID_GET_VALUE_PARAM: &str = "expected name=value";
 const ERR_INVALID_GET_VALUE_NO_NAME: &str = "name=value parameter missing name";
 const ERR_INVALID_GET_VALUE_NO_VALUE: &str = "name=value parameter missing value";
 const ERR_INVALID_LOG_LEVEL_KEY: &str = "invalid log level key name";
-
 const ERR_INVALID_HOTPLUG_TIMEOUT: &str = "invalid hotplug timeout parameter";
 const ERR_INVALID_HOTPLUG_TIMEOUT_PARAM: &str = "unable to parse hotplug timeout";
 const ERR_INVALID_HOTPLUG_TIMEOUT_KEY: &str = "invalid hotplug timeout key name";
@@ -59,6 +58,29 @@ const ERR_INVALID_CONTAINER_PIPE_SIZE: &str = "invalid container pipe size param
 const ERR_INVALID_CONTAINER_PIPE_SIZE_PARAM: &str = "unable to parse container pipe size";
 const ERR_INVALID_CONTAINER_PIPE_SIZE_KEY: &str = "invalid container pipe size key name";
 const ERR_INVALID_CONTAINER_PIPE_NEGATIVE: &str = "container pipe size should not be negative";
+
+const ERR_INVALID_GUEST_COMPONENTS_REST_API_VALUE: &str = "invalid guest components rest api feature given. Valid values are `all`, `attestation`, `resource`, or `none`";
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
+pub enum GuestComponentsFeatures {
+    All,
+    Attestation,
+    None,
+    #[default]
+    Resource,
+}
+
+impl fmt::Display for GuestComponentsFeatures {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let display = match self {
+            Self::All => String::from("all"),
+            Self::Attestation => String::from("attestation"),
+            Self::None => String::from("none"),
+            Self::Resource => String::from("resource"),
+        };
+        write!(f, "{display}")
+    }
+}
 
 #[derive(Debug)]
 pub struct AgentConfig {
@@ -76,7 +98,7 @@ pub struct AgentConfig {
     pub supports_seccomp: bool,
     pub https_proxy: String,
     pub no_proxy: String,
-    pub guest_components_rest_api: String,
+    pub guest_components_rest_api: GuestComponentsFeatures,
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,7 +116,7 @@ pub struct AgentConfigBuilder {
     pub tracing: Option<bool>,
     pub https_proxy: Option<String>,
     pub no_proxy: Option<String>,
-    pub guest_components_rest_api: Option<String>,
+    pub guest_components_rest_api: Option<GuestComponentsFeatures>,
 }
 
 macro_rules! config_override {
@@ -158,7 +180,7 @@ impl Default for AgentConfig {
             supports_seccomp: rpc::have_seccomp(),
             https_proxy: String::from(""),
             no_proxy: String::from(""),
-            guest_components_rest_api: String::from(DEFAULT_GUEST_COMPONENTS_REST_API_CONFIG),
+            guest_components_rest_api: GuestComponentsFeatures::default(),
         }
     }
 }
@@ -300,7 +322,7 @@ impl AgentConfig {
                 param,
                 GUEST_COMPONENTS_REST_API_OPTION,
                 config.guest_components_rest_api,
-                get_string_value
+                get_guest_components_features_value
             );
         }
 
@@ -455,6 +477,24 @@ fn get_url_value(param: &str) -> Result<String> {
     Ok(Url::parse(&value)?.to_string())
 }
 
+#[instrument]
+fn get_guest_components_features_value(param: &str) -> Result<GuestComponentsFeatures> {
+    let fields: Vec<&str> = param.split('=').collect();
+    ensure!(fields.len() >= 2, ERR_INVALID_GET_VALUE_PARAM);
+
+    // We need name (but the value can be blank)
+    ensure!(!fields[0].is_empty(), ERR_INVALID_GET_VALUE_NO_NAME);
+
+    let value = fields[1..].join("=");
+    match value.as_str() {
+        "all" => Ok(GuestComponentsFeatures::All),
+        "attestation" => Ok(GuestComponentsFeatures::Attestation),
+        "none" => Ok(GuestComponentsFeatures::None),
+        "resource" => Ok(GuestComponentsFeatures::Resource),
+        _ => Err(anyhow!(ERR_INVALID_GUEST_COMPONENTS_REST_API_VALUE)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use test_utils::assert_result;
@@ -493,7 +533,7 @@ mod tests {
             tracing: bool,
             https_proxy: &'a str,
             no_proxy: &'a str,
-            guest_components_rest_api: &'a str,
+            guest_components_rest_api: GuestComponentsFeatures,
         }
 
         impl Default for TestData<'_> {
@@ -511,7 +551,7 @@ mod tests {
                     tracing: false,
                     https_proxy: "",
                     no_proxy: "",
-                    guest_components_rest_api: DEFAULT_GUEST_COMPONENTS_REST_API_CONFIG,
+                    guest_components_rest_api: GuestComponentsFeatures::default(),
                 }
             }
         }
@@ -903,22 +943,22 @@ mod tests {
             },
             TestData {
                contents: "agent.guest_components_rest_api=attestation",
-               guest_components_rest_api: "attestation",
+               guest_components_rest_api: GuestComponentsFeatures::Attestation,
                 ..Default::default()
             },
             TestData {
                 contents: "agent.guest_components_rest_api=resource",
-                guest_components_rest_api: "resource",
+                guest_components_rest_api: GuestComponentsFeatures::Resource,
                 ..Default::default()
             },
             TestData {
                 contents: "agent.guest_components_rest_api=all",
-                guest_components_rest_api: "all",
+                guest_components_rest_api: GuestComponentsFeatures::All,
                 ..Default::default()
             },
             TestData {
-                contents: "agent.guest_components_rest_api=''",
-                guest_components_rest_api: "",
+                contents: "agent.guest_components_rest_api=none",
+                guest_components_rest_api: GuestComponentsFeatures::None,
                 ..Default::default()
             },
         ];
@@ -1439,6 +1479,68 @@ Caused by:
             let msg = format!("test[{}]: {:?}", i, d);
 
             let result = get_string_value(d.param);
+
+            let msg = format!("{}: result: {:?}", msg, result);
+
+            assert_result!(d.result, result, msg);
+        }
+    }
+
+    #[test]
+    fn test_get_guest_components_features_value() {
+        #[derive(Debug)]
+        struct TestData<'a> {
+            param: &'a str,
+            result: Result<GuestComponentsFeatures>,
+        }
+
+        let tests = &[
+            TestData {
+                param: "",
+                result: Err(anyhow!(ERR_INVALID_GET_VALUE_PARAM)),
+            },
+            TestData {
+                param: "=",
+                result: Err(anyhow!(ERR_INVALID_GET_VALUE_NO_NAME)),
+            },
+            TestData {
+                param: "==",
+                result: Err(anyhow!(ERR_INVALID_GET_VALUE_NO_NAME)),
+            },
+            TestData {
+                param: "x=all",
+                result: Ok(GuestComponentsFeatures::All),
+            },
+            TestData {
+                param: "x=attestation",
+                result: Ok(GuestComponentsFeatures::Attestation),
+            },
+            TestData {
+                param: "x=none",
+                result: Ok(GuestComponentsFeatures::None),
+            },
+            TestData {
+                param: "x=resource",
+                result: Ok(GuestComponentsFeatures::Resource),
+            },
+            TestData {
+                param: "x===",
+                result: Err(anyhow!(ERR_INVALID_GUEST_COMPONENTS_REST_API_VALUE)),
+            },
+            TestData {
+                param: "x==x",
+                result: Err(anyhow!(ERR_INVALID_GUEST_COMPONENTS_REST_API_VALUE)),
+            },
+            TestData {
+                param: "x=x",
+                result: Err(anyhow!(ERR_INVALID_GUEST_COMPONENTS_REST_API_VALUE)),
+            },
+        ];
+
+        for (i, d) in tests.iter().enumerate() {
+            let msg = format!("test[{}]: {:?}", i, d);
+
+            let result = get_guest_components_features_value(d.param);
 
             let msg = format!("{}: result: {:?}", msg, result);
 
