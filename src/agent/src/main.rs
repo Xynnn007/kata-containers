@@ -19,7 +19,7 @@ extern crate scopeguard;
 #[macro_use]
 extern crate slog;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use cfg_if::cfg_if;
 use clap::{AppSettings, Parser};
 use const_format::concatcp;
@@ -33,8 +33,10 @@ use std::os::unix::fs as unixfs;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::process::exit;
-use std::process::Command;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::process::Command;
+use tokio::time::sleep;
 use tracing::{instrument, span};
 
 mod config;
@@ -58,7 +60,6 @@ mod util;
 mod version;
 mod watcher;
 
-use config::GuestComponentsFeatures;
 use mount::{cgroups_mount, general_mount};
 use sandbox::Sandbox;
 use signal::setup_signal_handler;
@@ -404,7 +405,7 @@ async fn start_sandbox(
     sandbox.lock().await.sender = Some(tx);
 
     if Path::new(CDH_PATH).exists() && Path::new(AA_PATH).exists() {
-        init_attestation_components(logger, config)?;
+        init_attestation_components(logger, config).await?;
     }
 
     // vsock:///dev/vsock, port
@@ -418,19 +419,7 @@ async fn start_sandbox(
 }
 
 // Start-up attestation-agent, CDH and api-server-rest if they are packaged in the rootfs
-fn init_attestation_components(logger: &Logger, _config: &AgentConfig) -> Result<()> {
-    // The Attestation Agent will run for the duration of the guest.
-    launch_process(
-        logger,
-        AA_PATH,
-        &vec!["--attestation_sock", AA_ATTESTATION_URI],
-        AA_ATTESTATION_SOCKET,
-        DEFAULT_LAUNCH_PROCESS_TIMEOUT,
-    )
-    .map_err(|e| anyhow!("launch_process {} failed: {:?}", AA_PATH, e))?;
-
-    let config_path = OCICRYPT_CONFIG_PATH;
-
+async fn init_attestation_components(logger: &Logger, _config: &AgentConfig) -> Result<()> {
     // The image will need to be encrypted using a keyprovider
     // that has the same name (at least according to the config).
     let ocicrypt_config = serde_json::json!({
@@ -441,42 +430,53 @@ fn init_attestation_components(logger: &Logger, _config: &AgentConfig) -> Result
         }
     });
 
-    fs::write(config_path, ocicrypt_config.to_string().as_bytes())?;
+    tokio::fs::write(OCICRYPT_CONFIG_PATH, ocicrypt_config.to_string().as_bytes()).await?;
 
-    if let Err(e) = launch_process(
-        logger,
-        CDH_PATH,
-        &vec![],
-        CDH_SOCKET,
-        DEFAULT_LAUNCH_PROCESS_TIMEOUT,
-    ) {
-        error!(logger, "launch_process {} failed: {:?}", CDH_PATH, e);
-    } else {
-        let features = _config.guest_components_rest_api;
-        match features {
-            GuestComponentsFeatures::None => {}
-            _ => {
-                if let Err(e) = launch_process(
-                    logger,
-                    API_SERVER_PATH,
-                    &vec!["--features", &features.to_string()],
-                    "",
-                    0,
-                ) {
-                    error!(logger, "launch_process {} failed: {:?}", API_SERVER_PATH, e);
-                }
-            }
-        }
+    let features = _config.guest_components_rest_api.to_string();
+
+    tokio::try_join!(
+        launch_process(
+            logger,
+            AA_PATH,
+            vec!["--attestation_sock", AA_ATTESTATION_URI],
+            AA_ATTESTATION_SOCKET,
+            DEFAULT_LAUNCH_PROCESS_TIMEOUT,
+        ),
+        launch_process(
+            logger,
+            CDH_PATH,
+            vec![],
+            CDH_SOCKET,
+            DEFAULT_LAUNCH_PROCESS_TIMEOUT,
+        )
+    )?;
+
+    info!(logger, "AA and CDH are launched successfully.");
+
+    if let config::GuestComponentsFeatures::None = _config.guest_components_rest_api {
+        launch_process(
+            logger,
+            API_SERVER_PATH,
+            vec!["--features", &features],
+            "",
+            DEFAULT_LAUNCH_PROCESS_TIMEOUT,
+        )
+        .await?;
+
+        info!(
+            logger,
+            "ASR are launched successfully with feature {features}."
+        );
     }
 
     Ok(())
 }
 
-fn wait_for_path_to_exist(logger: &Logger, path: &str, timeout_secs: i32) -> Result<()> {
+async fn wait_for_path_to_exist(logger: &Logger, path: &str, timeout_secs: i32) -> Result<()> {
     let p = Path::new(path);
     let mut attempts = 0;
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        sleep(Duration::from_secs(1)).await;
         if p.exists() {
             return Ok(());
         }
@@ -493,22 +493,22 @@ fn wait_for_path_to_exist(logger: &Logger, path: &str, timeout_secs: i32) -> Res
     Err(anyhow!("wait for {} to exist timeout.", path))
 }
 
-fn launch_process(
+async fn launch_process(
     logger: &Logger,
     path: &str,
-    args: &Vec<&str>,
+    args: Vec<&str>,
     unix_socket_path: &str,
     timeout_secs: i32,
 ) -> Result<()> {
     if !Path::new(path).exists() {
-        return Err(anyhow!("path {} does not exist.", path));
+        bail!("path {} does not exist.", path);
     }
-    if !unix_socket_path.is_empty() && Path::new(unix_socket_path).exists() {
-        fs::remove_file(unix_socket_path)?;
-    }
-    Command::new(path).args(args).spawn()?;
+
+    // TODO: log the stderr and stdout to somewhere
+    let _cmd = Command::new(path).args(args).spawn()?;
+
     if !unix_socket_path.is_empty() && timeout_secs > 0 {
-        wait_for_path_to_exist(logger, unix_socket_path, timeout_secs)?;
+        wait_for_path_to_exist(logger, unix_socket_path, timeout_secs).await?;
     }
 
     Ok(())
