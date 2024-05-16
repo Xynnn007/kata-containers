@@ -788,9 +788,11 @@ func (k *kataAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
 		// If an empty setInitdata request is sent to kata-agent, no other steps will be
 		// executed but only launch Confidential Data Hub. This ensures the Confidential
 		// Data Hub is launched during the early time of guest.
+		k.Logger().Debug("Before call SetInitData")
 		if err = sandbox.agent.setInitdata(ctx, sandbox.config.AgentConfig.Initdata); err != nil {
 			return err
 		}
+		k.Logger().Debug("After call SetInitData")
 
 		// Setup network interfaces and routes
 		interfaces, routes, neighs, err := generateVCNetworkStructures(ctx, sandbox.network)

@@ -68,6 +68,7 @@ pub struct DefinedFields {
 }
 
 pub async fn do_set_initdata(req: &protocols::agent::SetInitdataRequest) -> Result<()> {
+    debug!(sl!(), "SetInitdata called.");
     // ensure the function could be called only once.
     if ALREADY_SET_INITDATA
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -88,6 +89,7 @@ pub async fn do_set_initdata(req: &protocols::agent::SetInitdataRequest) -> Resu
     }
 
     let initdata: Initdata = toml::from_str(&req.initdata).context("parse initdata TOML failed")?;
+    debug!(sl!(), "Initdata parse done.");
 
     if initdata.version != DEFAULT_INITDATA_VERSION {
         bail!("Unsupported initdata version, should be {DEFAULT_INITDATA_VERSION}");
@@ -112,6 +114,7 @@ pub async fn do_set_initdata(req: &protocols::agent::SetInitdataRequest) -> Resu
         others => bail!("Unsupported hash algorithm {others}"),
     };
 
+    debug!(sl!(), "Try to send CheckInitData req to AA.");
     let client = ttrpc::asynchronous::Client::connect(AA_ADDR)?;
     let aa_client = attestation_agent_ttrpc_async::AttestationAgentServiceClient::new(client);
     let req = CheckInitDataRequest {
@@ -162,6 +165,7 @@ pub async fn do_set_initdata(req: &protocols::agent::SetInitdataRequest) -> Resu
     }
 
     // launch CDH
+    debug!(sl!(), "Launch Confidential Data Hub");
     launch_confidential_data_hub(initdata.data.cdh_config).await?;
 
     Ok(())
