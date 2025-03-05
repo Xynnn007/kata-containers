@@ -492,7 +492,7 @@ func walkTree(workspace string) ([]*finalizeFileInfo, error) {
 		if fi.IsDir() {
 			entry.children = make([]*finalizeFileInfo, 0, 20)
 			dirMap[fp] = entry
-			entry.size = fi.Size()
+			entry.size = fi.Size() + 3
 		} else {
 			// calculate blocks
 			entry.size = fi.Size()
