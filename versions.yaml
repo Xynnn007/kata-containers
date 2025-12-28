@@ -384,6 +384,7 @@ externals:
       version: "edk2-stable202511"
       package: "OvmfPkg/IntelTdx/IntelTdxX64.dsc"
       package_output_dir: "IntelTdx"
+      reference_value_calculator: "https://raw.githubusercontent.com/Xynnn007/td-shim/refs/heads/mrtd-calc/python/td-shim-tools/src/bin/td-shim-tee-info-hash/td_shim_tee_info_hash.py"
     arm64:
       description: "UEFI for arm64 virtual machines."
       version: "edk2-stable202508"
