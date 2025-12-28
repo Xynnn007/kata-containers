@@ -84,7 +84,7 @@ jobs:
           PUSH_TO_REGISTRY: ${{ inputs.push-to-registry }}
           ARTEFACT_REGISTRY: ghcr.io
           ARTEFACT_REGISTRY_USERNAME: ${{ github.actor }}
-          ARTEFACT_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          ARTEFACT_REGISTRY_PASSWORD: ${{ secrets.XYNNN_GITHUB_TOKEN }}
           TARGET_BRANCH: ${{ inputs.target-branch }}
           RELEASE: ${{ inputs.stage == 'release' && 'yes' || 'no' }}
 
@@ -104,7 +104,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.XYNNN_GITHUB_TOKEN }}
 
       - uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1.4.4
         if: ${{ env.PERFORM_ATTESTATION == 'yes' }}
@@ -177,7 +177,7 @@ jobs:
           PUSH_TO_REGISTRY: ${{ inputs.push-to-registry }}
           ARTEFACT_REGISTRY: ghcr.io
           ARTEFACT_REGISTRY_USERNAME: ${{ github.actor }}
-          ARTEFACT_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          ARTEFACT_REGISTRY_PASSWORD: ${{ secrets.XYNNN_GITHUB_TOKEN }}
           TARGET_BRANCH: ${{ inputs.target-branch }}
           RELEASE: ${{ inputs.stage == 'release' && 'yes' || 'no' }}
 
@@ -304,7 +304,7 @@ jobs:
           PUSH_TO_REGISTRY: ${{ inputs.push-to-registry }}
           ARTEFACT_REGISTRY: ghcr.io
           ARTEFACT_REGISTRY_USERNAME: ${{ github.actor }}
-          ARTEFACT_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          ARTEFACT_REGISTRY_PASSWORD: ${{ secrets.XYNNN_GITHUB_TOKEN }}
           TARGET_BRANCH: ${{ inputs.target-branch }}
           RELEASE: ${{ inputs.stage == 'release' && 'yes' || 'no' }}
           MEASURED_ROOTFS: no

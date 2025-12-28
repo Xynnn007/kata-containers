@@ -98,7 +98,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.XYNNN_GITHUB_TOKEN }}
 
       - name: build-and-push-kata-payload for ${{ inputs.arch }}
         id: build-and-push-kata-payload

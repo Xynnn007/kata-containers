@@ -96,7 +96,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.XYNNN_GITHUB_TOKEN }}
 
       - name: Login to Kata Containers quay.io
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
@@ -279,10 +279,10 @@ jobs:
         env:
           QUAY_DEPLOYER_USERNAME: ${{ vars.QUAY_DEPLOYER_USERNAME }}
           QUAY_DEPLOYER_PASSWORD: ${{ secrets.QUAY_DEPLOYER_PASSWORD }}
-          GITHUB_TOKEN: ${{ github.token }}
+          XYNNN_GITHUB_TOKEN: ${{ github.token }}
         run: |
           echo "${QUAY_DEPLOYER_PASSWORD}" | helm registry login quay.io --username "${QUAY_DEPLOYER_USERNAME}" --password-stdin
-          echo "${GITHUB_TOKEN}" | helm registry login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+          echo "${XYNNN_GITHUB_TOKEN}" | helm registry login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
 
       - name: Push helm chart to the OCI registries
         run: |

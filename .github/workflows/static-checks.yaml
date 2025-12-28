@@ -142,7 +142,7 @@ jobs:
         env:
           ARTEFACT_REPOSITORY: "${{ github.repository }}"
           ARTEFACT_REGISTRY_USERNAME: "${{ github.actor }}"
-          ARTEFACT_REGISTRY_PASSWORD: "${{ secrets.GITHUB_TOKEN }}"
+          ARTEFACT_REGISTRY_PASSWORD: "${{ secrets.XYNNN_GITHUB_TOKEN }}"
         run: |
           "${GOPATH}/src/github.com/${GITHUB_REPOSITORY}/tests/install_regorus.sh"
       - name: Run check

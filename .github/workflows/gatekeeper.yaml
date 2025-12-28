@@ -38,7 +38,7 @@ jobs:
       - id: gatekeeper
         env:
           TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          XYNNN_GITHUB_TOKEN: ${{ secrets.XYNNN_GITHUB_TOKEN }}
           COMMIT_HASH: ${{ github.event.pull_request.head.sha }}
           GH_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |

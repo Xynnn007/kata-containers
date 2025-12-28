@@ -29,7 +29,7 @@ jobs:
       id: 'get-pr-commits'
       uses: tim-actions/get-pr-commits@c64db31d359214d244884dd68f971a110b29ab83 # v1.2.0
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.XYNNN_GITHUB_TOKEN }}
         # Filter out revert commits
         # The format of a revert commit is as follows:
         #
