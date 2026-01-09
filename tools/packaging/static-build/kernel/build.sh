@@ -64,8 +64,10 @@ fi
 
 container_build+=" --build-arg ARCH=${ARCH:-}"
 
+info "Pulling container image ${container_image}..."
 "${container_engine}" pull "${container_image}" || \
 	{
+		info "Building container image ${container_image}..."
 		${container_build} -t "${container_image}" "${script_dir}" && \
 		# No-op unless PUSH_TO_REGISTRY is exported as "yes"
 		push_to_registry "${container_image}";
