@@ -597,11 +597,13 @@ install_kata() {
 	fi
 
 	if [[ -n "${conf_guest}" && "${arch_target}" = "x86_64" ]];then
-		info "Generate kernel reference value (TDX) for confidential kernel for x86_64"
+		info "Generating reference value (TDX) for confidential kernel for x86_64..."
+		info "Installing yq..."
+		install_yq
 		local tdx_reference_value_calculator_url=$(get_from_kata_deps ".assets.kernel.confidential.reference_value_calculator.tdx")
-		curl -fsSL $tdx_reference_value_calculator_url -o $build_root/td_payload_qemu_hash.py 
+		curl -fsSL $tdx_reference_value_calculator_url -o td_payload_qemu_hash.py 
 		reference_value=$(python3 td_payload_qemu_hash.py \
-			-i ${bzImage})
+			-k ${bzImage})
 		cat <<EOF > reference_value.json
 {
 	"rv://coco/tdx/kernel": [
@@ -609,6 +611,8 @@ install_kata() {
 	]
 }
 EOF
+		info "Reference Value for confidential kernel for x86_64: $reference_value"
+		info "Reference Value saved."
 	fi
 
 	# Install compressed kernel
