@@ -104,6 +104,7 @@ if [ "${ovmf_build}" == "sev" ]; then
 	install $build_root/$ovmf_dir/"${build_path_fv}"/OVMF.fd "${install_dir}/AMDSEV.fd"
 elif [ "${ovmf_build}" == "tdx" ]; then
 	install $build_root/$ovmf_dir/"${build_path_fv}"/OVMF.fd "${install_dir}/OVMF.inteltdx.fd"
+	install $build_root/reference_value.json "${install_dir}/reference_value.json"
 elif [ "${ovmf_build}" == "arm64" ] || [ "${ovmf_build}" == "cca" ]; then
 	install $build_root/$ovmf_dir/"${build_path_fv}"/QEMU_EFI.fd "${install_dir}/AAVMF_CODE.fd"
 	install $build_root/$ovmf_dir/"${build_path_fv}"/QEMU_VARS.fd "${install_dir}/AAVMF_VARS.fd"
@@ -113,7 +114,6 @@ elif [ "${ovmf_build}" == "arm64" ] || [ "${ovmf_build}" == "cca" ]; then
 	truncate -s 64M ${install_dir}/AAVMF_VARS.fd
 else
 	install $build_root/$ovmf_dir/"${build_path_fv}"/OVMF.fd "${install_dir}"
-	install $build_root/reference_value.json "${install_dir}/reference_value.json"
 fi
 
 local_dir=${PWD}
