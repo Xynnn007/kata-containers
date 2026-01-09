@@ -212,6 +212,9 @@ assets:
       description: "Linux kernel with x86_64 TEEs (SNP and TDX) support"
       url: "https://cdn.kernel.org/pub/linux/kernel/v6.x/"
       version: "v6.16.7"
+      reference_value_calculator:
+        # Qemu Direct boot upon TDVF
+        - tdx: https://raw.githubusercontent.com/Xynnn007/td-shim/refs/heads/mrtd-calc/python/td-shim-tools/src/bin/td-payload-reference-calculator/td_payload_qemu_hash.py
 
   kernel-arm-experimental:
     description: "Linux kernel with cpu/mem hotplug support on arm64"

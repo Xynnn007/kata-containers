@@ -596,11 +596,27 @@ install_kata() {
 		die "failed to find image"
 	fi
 
+	if [[ -n "${conf_guest}" && "${arch_target}" = "x86_64" ]];then
+		info "Generate kernel reference value (TDX) for confidential kernel for x86_64"
+		local tdx_reference_value_calculator_url=$(get_from_kata_deps ".assets.kernel.confidential.reference_value_calculator.tdx")
+		curl -fsSL $tdx_reference_value_calculator_url -o $build_root/td_payload_qemu_hash.py 
+		reference_value=$(python3 td_payload_qemu_hash.py \
+			-i ${bzImage})
+		cat <<EOF > reference_value.json
+{
+	"rv://coco/tdx/kernel": [
+		"$reference_value"
+	]
+}
+EOF
+	fi
+
 	# Install compressed kernel
 	if [ "${arch_target}" = "powerpc" ]; then
 		install --mode 0644 -D "vmlinux" "${install_path}/${vmlinuz}"
 	else
 		install --mode 0644 -D "${bzImage}" "${install_path}/${vmlinuz}"
+		install --mode 0666 -D "reference_value.json" "${install_path}/reference_value.json"
 	fi
 
 	# Install uncompressed kernel
