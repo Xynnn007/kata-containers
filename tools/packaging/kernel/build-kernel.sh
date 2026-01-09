@@ -34,6 +34,7 @@ readonly VENDOR_INTEL="intel"
 readonly VENDOR_NVIDIA="nvidia"
 readonly KBUILD_SIGN_PIN=${KBUILD_SIGN_PIN:-""}
 readonly KERNEL_DEBUG_ENABLED=${KERNEL_DEBUG_ENABLED:-"no"}
+readonly TDX_REFERENCE_VALUE_CALCULATOR_URL=${TDX_REFERENCE_VALUE_CALCULATOR_URL:-""}
 
 #Path to kernel directory
 kernel_path=""
@@ -596,12 +597,9 @@ install_kata() {
 		die "failed to find image"
 	fi
 
-	if [[ -n "${conf_guest}" && "${arch_target}" = "x86_64" ]];then
+	if [[ -n "${conf_guest}" && "${arch_target}" = "x86_64" && -n "${TDX_REFERENCE_VALUE_CALCULATOR_URL}" ]];then
 		info "Generating reference value (TDX) for confidential kernel for x86_64..."
-		info "Installing yq..."
-		install_yq
-		local tdx_reference_value_calculator_url=$(get_from_kata_deps ".assets.kernel.confidential.reference_value_calculator.tdx")
-		curl -fsSL $tdx_reference_value_calculator_url -o td_payload_qemu_hash.py 
+		curl -fsSL ${TDX_REFERENCE_VALUE_CALCULATOR_URL} -o td_payload_qemu_hash.py 
 		reference_value=$(python3 td_payload_qemu_hash.py \
 			-k ${bzImage})
 		cat <<EOF > reference_value.json
