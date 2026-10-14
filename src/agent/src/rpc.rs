@@ -2737,6 +2737,52 @@ pub(crate) async fn cdh_secure_mount(
     Ok(())
 }
 
+/// SecureMount a CDF v1 volume via CDH (`volume_type=cdf`).
+/// Driver options from the host carry `cdf.*` metadata and `volume_type=cdf`.
+pub(crate) async fn cdh_secure_mount_cdf(
+    device_id: &str,
+    storage: &protocols::agent::Storage,
+) -> Result<()> {
+    if !confidential_data_hub::is_cdh_client_initialized() {
+        return Err(anyhow!(
+            "CDH client not initialized; cannot mount volume_type=cdf"
+        ));
+    }
+
+    let mut options = std::collections::HashMap::new();
+    options.insert("deviceId".to_string(), device_id.to_string());
+    if !storage.fstype.is_empty() {
+        options.insert("filesystemType".to_string(), storage.fstype.clone());
+    }
+
+    for opt in &storage.driver_options {
+        if let Some((k, v)) = opt.split_once('=') {
+            if k == "volume_type" {
+                continue;
+            }
+            options.insert(k.to_string(), v.to_string());
+        }
+    }
+
+    info!(
+        sl(),
+        "cdh_secure_mount_cdf: device_id {}, mount_point {}, options {:?}",
+        device_id,
+        storage.mount_point,
+        options
+    );
+
+    std::fs::create_dir_all(&storage.mount_point).inspect_err(|e| {
+        error!(
+            sl(),
+            "Failed to create mount point directory {}: {:?}", storage.mount_point, e
+        );
+    })?;
+
+    confidential_data_hub::secure_mount("cdf", &options, vec![], &storage.mount_point).await?;
+    Ok(())
+}
+
 async fn unseal_envs(envs: &mut [String]) {
     for env in envs.iter_mut() {
         match confidential_data_hub::unseal_env(env).await {

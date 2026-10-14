@@ -38,6 +38,7 @@ use slog::Logger;
 use std::str::FromStr;
 
 const EPHEMERAL_ENCRYPTION_DRIVER_OPTION: &str = "encryption_key=ephemeral";
+const CDF_VOLUME_TYPE_OPTION: &str = "volume_type=cdf";
 const MKFS_EXT4: &str = "mkfs.ext4";
 const BLOCK_EMPTYDIR_EXT4_MKFS_OPTS: [&str; 8] =
     ["-O", "^has_journal", "-m", "0", "-i", "163840", "-I", "128"];
@@ -46,6 +47,7 @@ const BLOCK_EMPTYDIR_EXT4_MKFS_OPTS: [&str; 8] =
 struct BlockStorageDriverOptions {
     has_ephemeral_encryption: bool,
     should_create_filesystem: bool,
+    is_cdf: bool,
 }
 
 fn get_device_number(dev_path: &str, metadata: Option<&fs::Metadata>) -> Result<String> {
@@ -66,6 +68,12 @@ async fn handle_block_storage(
     dev_num: &str,
 ) -> Result<Arc<dyn StorageDevice>> {
     let options = block_storage_driver_options(storage)?;
+
+    if options.is_cdf {
+        crate::rpc::cdh_secure_mount_cdf(dev_num, storage).await?;
+        set_ownership(logger, storage)?;
+        return new_device(storage.mount_point.clone());
+    }
 
     if options.has_ephemeral_encryption {
         let mkfs_opts = BLOCK_EMPTYDIR_EXT4_MKFS_OPTS.join(" ");
@@ -93,7 +101,19 @@ fn block_storage_driver_options(storage: &Storage) -> Result<BlockStorageDriverO
         .driver_options
         .iter()
         .any(|opt| opt == EPHEMERAL_ENCRYPTION_DRIVER_OPTION);
+    let is_cdf = storage
+        .driver_options
+        .iter()
+        .any(|opt| opt == CDF_VOLUME_TYPE_OPTION);
     let should_create_filesystem = should_create_block_filesystem(storage);
+
+    if has_ephemeral_encryption && is_cdf {
+        return Err(anyhow!(
+            "cannot combine {} with {}",
+            EPHEMERAL_ENCRYPTION_DRIVER_OPTION,
+            CDF_VOLUME_TYPE_OPTION
+        ));
+    }
 
     if has_ephemeral_encryption && !should_create_filesystem {
         return Err(anyhow!(
@@ -106,6 +126,7 @@ fn block_storage_driver_options(storage: &Storage) -> Result<BlockStorageDriverO
     Ok(BlockStorageDriverOptions {
         has_ephemeral_encryption,
         should_create_filesystem,
+        is_cdf,
     })
 }
 
@@ -184,6 +205,7 @@ mod tests {
             BlockStorageDriverOptions {
                 has_ephemeral_encryption: false,
                 should_create_filesystem: false,
+                is_cdf: false,
             }
         );
     }
@@ -199,6 +221,7 @@ mod tests {
             BlockStorageDriverOptions {
                 has_ephemeral_encryption: false,
                 should_create_filesystem: true,
+                is_cdf: false,
             }
         );
     }
@@ -217,6 +240,26 @@ mod tests {
             BlockStorageDriverOptions {
                 has_ephemeral_encryption: true,
                 should_create_filesystem: true,
+                is_cdf: false,
+            }
+        );
+    }
+
+    #[test]
+    fn block_storage_options_allow_cdf() {
+        let storage = storage_with_driver_options(&[
+            CDF_VOLUME_TYPE_OPTION,
+            "cdf.kbs-key-id=kbs:///default/cdf/orders-db",
+        ]);
+
+        let options = block_storage_driver_options(&storage).unwrap();
+
+        assert_eq!(
+            options,
+            BlockStorageDriverOptions {
+                has_ephemeral_encryption: false,
+                should_create_filesystem: false,
+                is_cdf: true,
             }
         );
     }

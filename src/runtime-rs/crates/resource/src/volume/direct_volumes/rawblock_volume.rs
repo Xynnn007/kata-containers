@@ -19,7 +19,7 @@ use oci_spec::runtime as oci;
 use tokio::sync::RwLock;
 
 use crate::volume::{
-    direct_volumes::KATA_DIRECT_VOLUME_TYPE,
+    direct_volumes::{KATA_CDF_VOLUME_TYPE, KATA_DIRECT_VOLUME_TYPE},
     utils::{handle_block_volume, is_block_device_readonly},
     Volume,
 };
@@ -42,8 +42,10 @@ impl RawblockVolume {
     ) -> Result<Self> {
         let blkdev_info = get_block_device_info(d).await;
 
-        // check volume type
-        if mount_info.volume_type != KATA_DIRECT_VOLUME_TYPE {
+        // check volume type (directvol hot-plug path; cdf uses the same attach + CDH open)
+        if mount_info.volume_type != KATA_DIRECT_VOLUME_TYPE
+            && mount_info.volume_type != KATA_CDF_VOLUME_TYPE
+        {
             return Err(anyhow!(
                 "volume type {:?} is invalid",
                 mount_info.volume_type
@@ -106,8 +108,20 @@ impl RawblockVolume {
         .await
         .context("do handle block volume failed")?;
 
+        let mut storage = block_volume.0;
+        if mount_info.volume_type == KATA_CDF_VOLUME_TYPE {
+            storage.driver_options.push("volume_type=cdf".to_string());
+            for (key, value) in &mount_info.metadata {
+                if key.starts_with("cdf.") {
+                    storage
+                        .driver_options
+                        .push(format!("{}={}", key, value));
+                }
+            }
+        }
+
         Ok(Self {
-            storage: Some(block_volume.0),
+            storage: Some(storage),
             mount: block_volume.1,
             device_id: block_volume.2,
         })

@@ -282,6 +282,13 @@ type Mount struct {
 	// fresh block volume. The filesystem type comes from the Storage Fstype.
 	BlockDeviceCreateFs bool
 
+	// VolumeType is the DirectVolume mountInfo.json "volume-type" (e.g. "cdf").
+	VolumeType string
+
+	// DirectVolumeOptions are key=value pairs forwarded to the agent as
+	// Storage.DriverOptions (CDF metadata, volume_type=cdf, …).
+	DirectVolumeOptions []string
+
 	// Shared indicates whether the mount is shared across containers.
 	Shared bool
 }

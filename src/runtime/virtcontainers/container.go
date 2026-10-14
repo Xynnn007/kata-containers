@@ -674,6 +674,13 @@ func (c *Container) createBlockDevices(ctx context.Context) error {
 			c.mounts[i].Type = mntInfo.FsType
 			c.mounts[i].Options = mntInfo.Options
 			c.mounts[i].ReadOnly = readonly
+			c.mounts[i].VolumeType = mntInfo.VolumeType
+			if mntInfo.VolumeType == "cdf" {
+				c.mounts[i].DirectVolumeOptions = append(
+					c.mounts[i].DirectVolumeOptions,
+					"volume_type=cdf",
+				)
+			}
 
 			for key, value := range mntInfo.Metadata {
 				switch key {
@@ -700,6 +707,14 @@ func (c *Container) createBlockDevices(ctx context.Context) error {
 					}
 					c.mounts[i].FSGroupChangePolicy = volume.FSGroupChangePolicy(value)
 				default:
+					// Forward CDF (and other) DirectVolume metadata to the agent.
+					if strings.HasPrefix(key, "cdf.") || mntInfo.VolumeType == "cdf" {
+						c.mounts[i].DirectVolumeOptions = append(
+							c.mounts[i].DirectVolumeOptions,
+							fmt.Sprintf("%s=%s", key, value),
+						)
+						continue
+					}
 					c.Logger().Warnf("Ignoring unsupported direct-assignd volume metadata key: %s, value: %s", key, value)
 				}
 			}

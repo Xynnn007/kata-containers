@@ -2026,6 +2026,9 @@ func (k *kataAgent) handleDeviceBlockVolume(c *Container, m Mount, device api.De
 	if m.BlockDeviceCreateFs {
 		vol.DriverOptions = append(vol.DriverOptions, volume.BlockVolumeCreateFsDriverKey)
 	}
+	if len(m.DirectVolumeOptions) > 0 {
+		vol.DriverOptions = append(vol.DriverOptions, m.DirectVolumeOptions...)
+	}
 
 	vol.Shared = m.Shared
 
